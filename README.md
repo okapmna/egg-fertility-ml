@@ -1,4 +1,4 @@
-# 🥚 Egg Fertility Detection using YOLOv8
+# Egg Fertility Detection using YOLOv8
 
 Proyek Machine Learning untuk mendeteksi kesuburan telur (Egg Candling Classification & Detection) menggunakan model **YOLOv8** (Ultralytics) dengan membedakan 2 kelas utama:
 - `0`: **fertile** (telur fertil / berembrio)
@@ -21,7 +21,7 @@ egg-fertility-ml/
 
 ---
 
-## 🚀 Panduan Memulai
+## Panduan Memulai
 
 ### 1. Prasyarat & Instalasi
 
