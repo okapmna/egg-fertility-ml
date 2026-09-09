@@ -8,7 +8,7 @@ Pipeline ini dirancang untuk mengunduh dataset secara otomatis dari Roboflow/Kag
 
 ---
 
-## 📁 Struktur Proyek
+## Struktur Proyek
 
 ```text
 egg-fertility-ml/
@@ -65,7 +65,7 @@ Buka dan jalankan notebook [`egg_fertil_ml.ipynb`](./egg_fertil_ml.ipynb) secara
 
 ---
 
-## 🔒 Keamanan & Kebersihan Repositori
+## Keamanan & Kebersihan Repositori
 
 - File `.env` sudah masuk ke `.gitignore` sehingga tidak akan pernah ter-push ke GitHub.
 - Output cell notebook telah dibersihkan sebelum commit agar ukuran repository tetap ringan dan riwayat Git tetap bersih.
