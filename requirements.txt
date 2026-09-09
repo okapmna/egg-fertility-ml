@@ -1,0 +1,10 @@
+ultralytics>=8.0.0
+roboflow
+python-dotenv
+pyyaml
+opencv-python
+matplotlib
+tqdm
+pillow
+pandas
+numpy

@@ -1,0 +1,37 @@
+# Kredensial & Lingkungan Rahasia
+.env
+*.env
+.env.*
+!.env.example
+
+# File Dataset & Cache Unduhan
+datasets/
+merged_egg_dataset/
+/content/
+data/
+*.zip
+*.tar.gz
+
+# Model Weights, Checkpoints & Training Runs
+runs/
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Jupyter Notebook Checkpoints & Cache
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+
+# Python Virtual Environment & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+
+# Mac / Linux OS files
+.DS_Store
+Thumbs.db
