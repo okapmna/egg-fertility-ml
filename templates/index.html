@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deteksi Fertilitas Telur — YOLO11n + MobileNetV2</title>
+<title>Deteksi Fertilitas Telur — YOLO11n + Classifier</title>
 <style>
   :root { color-scheme: light; }
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -12,7 +12,7 @@
   .sub { color: #666; margin-bottom: 16px; }
   #status { display: inline-block; padding: 4px 10px; border-radius: 999px;
             font-size: .85rem; margin-bottom: 16px; background: #eee; }
-  #status.ok { background: #dff0d8; color: #2e6b2e; }
+  #status.ok  { background: #dff0d8; color: #2e6b2e; }
   #status.err { background: #f8d7da; color: #842029; }
   #drop { border: 2px dashed #999; border-radius: 12px; padding: 28px;
           text-align: center; cursor: pointer; margin-bottom: 16px; }
@@ -21,23 +21,37 @@
   .panel { flex: 1 1 300px; }
   label.slider { display: block; margin: 12px 0; font-size: .9rem; }
   label.slider output { font-weight: bold; }
+  .select-group { margin: 12px 0; font-size: .9rem; }
+  .select-group label { display: block; margin-bottom: 4px; font-weight: 600; color: #444; }
+  .select-group select {
+    width: 100%; padding: 8px 10px; border: 1px solid #ccc;
+    border-radius: 8px; font-size: .9rem; background: #fff;
+    cursor: pointer; appearance: auto;
+  }
+  .select-group select:focus { outline: 2px solid #0b6efd; border-color: #0b6efd; }
+  .model-badge {
+    display: inline-block; margin-top: 4px; padding: 2px 8px;
+    background: #e8f0fe; color: #1a56db; border-radius: 6px; font-size: .8rem;
+  }
+  .model-badge.loaded { background: #dff0d8; color: #2e6b2e; }
   button { background: #0b6efd; color: #fff; border: 0; border-radius: 8px;
-           padding: 10px 20px; font-size: 1rem; cursor: pointer; }
+           padding: 10px 20px; font-size: 1rem; cursor: pointer; margin-top: 8px; }
   button:disabled { background: #999; cursor: wait; }
   #result img { max-width: 100%; border-radius: 8px; border: 1px solid #ddd; }
   table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: .9rem; }
   th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
   th { background: #f5f5f5; }
-  .fertile { color: #1a7a1a; font-weight: bold; }
+  .fertile   { color: #1a7a1a; font-weight: bold; }
   .infertile { color: #b3261e; font-weight: bold; }
   #error { color: #b3261e; margin-top: 12px; white-space: pre-wrap; }
   .counts { margin: 8px 0; font-size: .95rem; }
+  .info-used { margin: 4px 0; font-size: .82rem; color: #666; }
   a.dl { display: inline-block; margin-top: 8px; font-size: .9rem; }
 </style>
 </head>
 <body>
 <h1>Deteksi Fertilitas Telur</h1>
-<div class="sub">Gambar &rarr; <b>YOLO11n</b> (deteksi telur) &rarr; <b>MobileNetV2</b> (fertile / infertile)</div>
+<div class="sub">Gambar &rarr; <b>YOLO11n</b> (deteksi telur) &rarr; <b>Classifier pilihan</b> (fertile / infertile)</div>
 <div id="status">mengecek model…</div>
 
 <div id="drop">Seret gambar ke sini atau <b>klik untuk memilih</b> (JPG/PNG, maks 10MB)
@@ -46,17 +60,38 @@
 
 <div class="row">
   <div class="panel">
+
+    <!-- Pilihan model classifier -->
+    <div class="select-group">
+      <label for="classifier_file">🧠 Model Classifier</label>
+      <select id="classifier_file">
+        {% if classifier_files %}
+          {% for f in classifier_files %}
+          <option value="{{ f }}" {% if f == default_classifier %}selected{% endif %}>
+            {{ f }}{% if f == default_classifier %} (default){% endif %}
+          </option>
+          {% endfor %}
+        {% else %}
+          <option value="" disabled>Tidak ada file .pt di folder model/</option>
+        {% endif %}
+      </select>
+      <span class="model-badge" id="model-badge">belum dimuat</span>
+    </div>
+
     <label class="slider">Confidence detector: <output id="oConf">{{ det_conf }}</output>
       <input type="range" id="det_conf" min="0.05" max="0.9" step="0.05" value="{{ det_conf }}" style="width:100%">
     </label>
     <label class="slider">Threshold fertile: <output id="oThr">{{ thr_fertile }}</output>
       <input type="range" id="thr_fertile" min="0.05" max="0.95" step="0.05" value="{{ thr_fertile }}" style="width:100%">
     </label>
+
     <button id="go" disabled>Jalankan deteksi</button>
     <div id="error"></div>
   </div>
+
   <div class="panel" id="result" hidden>
     <div class="counts" id="counts"></div>
+    <div class="info-used" id="info-used"></div>
     <img id="out" alt="hasil anotasi">
     <div><a class="dl" id="dl" download="hasil_telur.jpg">Unduh gambar hasil</a></div>
     <table>
@@ -69,18 +104,38 @@
 <script>
 const $ = id => document.getElementById(id);
 const drop = $('drop'), fileInput = $('file'), go = $('go');
+const badge = $('model-badge');
 
-// status model saat halaman dibuka
+// --- status model saat halaman dibuka ---
 fetch('/api/health').then(r => r.json()).then(h => {
   const s = $('status');
-  if (h.ok) { s.textContent = 'model siap (' + h.models.device + ')'; s.className = 'ok'; }
-  else { s.textContent = 'model BELUM siap: ' + h.models.error; s.className = 'err'; }
-}).catch(() => { $('status').textContent = 'gagal menghubungi server'; $('status').className = 'err'; });
+  if (h.ok) {
+    s.textContent = 'model siap (' + h.models.device + ')';
+    s.className = 'ok';
+    badge.textContent = 'siap dimuat';
+    badge.className = 'model-badge loaded';
+  } else {
+    s.textContent = 'model BELUM siap: ' + (h.models.error || '');
+    s.className = 'err';
+    badge.textContent = 'error';
+  }
+}).catch(() => {
+  $('status').textContent = 'gagal menghubungi server';
+  $('status').className = 'err';
+});
 
+// --- update badge saat ganti classifier ---
+$('classifier_file').addEventListener('change', () => {
+  badge.textContent = 'akan dimuat saat dijalankan';
+  badge.className = 'model-badge';
+});
+
+// --- slider label ---
 for (const [slider, out] of [['det_conf','oConf'], ['thr_fertile','oThr']]) {
   $(slider).addEventListener('input', e => { $(out).textContent = e.target.value; });
 }
 
+// --- file drop / pick ---
 let currentFile = null;
 function setFile(f) {
   if (!f || !f.type.startsWith('image/')) return;
@@ -93,21 +148,34 @@ fileInput.addEventListener('change', e => setFile(e.target.files[0]));
 ['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
 
+// --- prediksi ---
 go.addEventListener('click', async () => {
   if (!currentFile) return;
-  go.disabled = true; $('error').textContent = '';
+  go.disabled = true;
+  $('error').textContent = '';
+
   const fd = new FormData();
   fd.append('image', currentFile);
   fd.append('det_conf', $('det_conf').value);
   fd.append('thr_fertile', $('thr_fertile').value);
+  fd.append('classifier_file', $('classifier_file').value);
+
   try {
     const r = await fetch('/api/predict', { method: 'POST', body: fd });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    $('out').src = j.annotated; $('dl').href = j.annotated;
-    $('counts').innerHTML = 'Ditemukan <b>' + j.detections.length + '</b> telur — ' +
+
+    // update badge: model sudah berhasil digunakan
+    badge.textContent = '✓ digunakan';
+    badge.className = 'model-badge loaded';
+
+    $('out').src = j.annotated;
+    $('dl').href = j.annotated;
+    $('counts').innerHTML =
+      'Ditemukan <b>' + j.detections.length + '</b> telur — ' +
       '<span class="fertile">fertile: ' + j.counts.fertile + '</span> · ' +
       '<span class="infertile">infertile: ' + j.counts.infertile + '</span>';
+    $('info-used').textContent = 'Classifier: ' + (j.classifier_used || '-');
     $('tbody').innerHTML = j.detections.map((d, i) =>
       '<tr><td>' + (i+1) + '</td><td class="' + d.cls + '">' + d.cls + '</td><td>' +
       d.prob.toFixed(3) + '</td><td>' + d.box.map(v => Math.round(v)).join(', ') + '</td></tr>'
