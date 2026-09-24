@@ -1,0 +1,7 @@
+# Dependensi halaman web demo (detector YOLO11n + classifier MobileNetV2)
+flask>=3.0
+pillow
+numpy
+torch
+torchvision
+ultralytics

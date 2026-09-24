@@ -12,12 +12,30 @@ Pipeline ini dirancang untuk mengunduh dataset secara otomatis dari Roboflow/Kag
 
 ```text
 egg-fertility-ml/
-├── .gitignore              # Mengabaikan kredensial, dataset, dan model weights
-├── .env.example            # Template environment variable
-├── requirements.txt        # Daftar dependensi Python
-├── README.md               # Dokumentasi proyek
-└── egg_fertil_ml.ipynb     # Notebook pipeline training & evaluasi
+├── .gitignore                      # Mengabaikan kredensial, dataset, dan model weights
+├── .env.example                    # Template environment variable
+├── requirements.txt                # Dependensi training utama
+├── requirements-web.txt            # Dependensi web demo (Flask, PyTorch, Torchvision, Ultralytics)
+├── README.md                       # Dokumentasi proyek
+├── app.py                          # Aplikasi web demo (Flask) untuk inferensi deteksi + klasifikasi
+├── templates/
+│   └── index.html                  # Antarmuka web modern untuk upload gambar & visualisasi hasil
+├── model/                          # Direktori penyimpanan bobot model (diabaikan oleh git)
+│   └── .gitkeep
+├── egg_fertil_ml.ipynb             # Notebook pipeline YOLOv8 end-to-end (deteksi & klasifikasi langsung)
+└── train_mobilenet_classifier.ipynb # Notebook training classifier MobileNetV2 (arsitektur dua-tahap)
 ```
+
+---
+
+## Alur Pipeline & Arsitektur
+
+Proyek ini mendukung dua arsitektur deteksi kesuburan telur:
+1. **Deteksi Langsung (YOLOv8)**: Dilatih pada [`egg_fertil_ml.ipynb`](./egg_fertil_ml.ipynb).
+2. **Arsitektur Dua-Tahap (Two-Stage Pipeline)**:
+   - **Tahap 1 (Deteksi Telur)**: YOLO11n mendeteksi lokasi telur dalam gambar candling.
+   - **Tahap 2 (Klasifikasi Fertilitas)**: Crop telur dimasukkan ke MobileNetV2 (input 320x320) untuk membedakan `fertile` (berembrio/pembuluh darah) vs `infertile` (kosong).
+   - Training classifier dilakukan pada [`train_mobilenet_classifier.ipynb`](./train_mobilenet_classifier.ipynb) dengan augmentasi khusus anti-shortcut learning (ColorJitter & Grayscale) untuk mencegah bias warna candling.
 
 ---
 
@@ -25,47 +43,37 @@ egg-fertility-ml/
 
 ### 1. Prasyarat & Instalasi
 
-Pastikan Python (>= 3.8) terinstal, lalu instal seluruh pustaka yang diperlukan:
+Pastikan Python (>= 3.8) terinstal:
 
-```bash
-pip install -r requirements.txt
-```
+- Untuk kebutuhan training:
+  ```bash
+  pip install -r requirements.txt
+  ```
 
-### 2. Konfigurasi API Key Roboflow
+- Untuk menjalankan web demo:
+  ```bash
+  pip install -r requirements-web.txt
+  ```
 
-Proyek ini membutuhkan API Key dari [Roboflow Universe](https://universe.roboflow.com/) untuk mengunduh dataset.
+### 2. Menjalankan Web Demo (Inference)
 
-#### Opsi A: Menjalankan di Lingkungan Lokal
-1. Salin file `.env.example` menjadi `.env`:
+1. Pastikan file model sudah ditempatkan di direktori `model/`:
+   - `model/yolo11n.pt` (detector)
+   - `model/mobilenet_egg_best.pt` (classifier)
+2. Jalankan aplikasi web:
    ```bash
-   cp .env.example .env
+   python app.py
    ```
-2. Buka `.env` dan masukkan API Key Anda:
-   ```ini
-   ROBOFLOW_API_KEY=your_actual_roboflow_api_key
-   ```
+3. Buka browser di `http://127.0.0.1:5000`. Anda dapat mengunggah foto candling telur dan menyesuaikan threshold deteksi serta fertilitas secara interaktif.
 
-#### Opsi B: Menjalankan di Google Colab
-1. Buka Google Colab.
-2. Klik ikon kunci (Secrets) di panel sebelah kiri.
-3. Tambahkan secret baru dengan nama **`ROBOFLOW_API_KEY`** dan masukkan nilai API Key Anda.
-4. Berikan izin akses notebook ke secret tersebut.
+### 3. Training & Pengembangan
 
-*Catatan: Jika API key belum terpasang di `.env` maupun Colab Secrets, notebook akan secara otomatis menampilkan prompt interaktif yang aman untuk menginputkan API key.*
-
-### 3. Menjalankan Pipeline
-
-Buka dan jalankan notebook [`egg_fertil_ml.ipynb`](./egg_fertil_ml.ipynb) secara berurutan:
-1. Pengecekan akselerator GPU (CUDA).
-2. Download & penggabungan dataset ke folder lokal runtime.
-3. Harmonisasi label format YOLOv8.
-4. Training model YOLOv8n.
-5. Evaluasi performa (mAP, Precision, Recall, Confusion Matrix).
-6. Export model ke format ONNX.
+- **Klasifikasi MobileNetV2**: Buka [`train_mobilenet_classifier.ipynb`](./train_mobilenet_classifier.ipynb) (di Colab / lokal) untuk melatih classifier dengan fitur transfer learning, penyeimbangan sampling, dan evaluasi F-score.
+- **Deteksi YOLOv8**: Buka [`egg_fertil_ml.ipynb`](./egg_fertil_ml.ipynb) untuk melatih detektor bounding box telur.
 
 ---
 
 ## Keamanan & Kebersihan Repositori
 
-- File `.env` sudah masuk ke `.gitignore` sehingga tidak akan pernah ter-push ke GitHub.
-- Output cell notebook telah dibersihkan sebelum commit agar ukuran repository tetap ringan dan riwayat Git tetap bersih.
+- File `.env` dan file bobot besar (`*.pt`, `*.onnx`) diabaikan oleh `.gitignore` sehingga tidak ter-push ke repository.
+- Output cell notebook telah dibersihkan agar ukuran riwayat Git tetap ringan.
