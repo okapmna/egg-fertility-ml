@@ -3,190 +3,720 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Deteksi Fertilitas Telur — YOLO11n + Classifier</title>
+<title>Sistem Deteksi Fertilitas Telur</title>
 <style>
-  :root { color-scheme: light; }
-  body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-         max-width: 1080px; margin: 24px auto; padding: 0 16px; color: #222; }
-  h1 { font-size: 1.4rem; margin-bottom: 4px; }
-  .sub { color: #666; margin-bottom: 16px; }
-  #status { display: inline-block; padding: 4px 10px; border-radius: 999px;
-            font-size: .85rem; margin-bottom: 16px; background: #eee; }
-  #status.ok  { background: #dff0d8; color: #2e6b2e; }
-  #status.err { background: #f8d7da; color: #842029; }
-  #drop { border: 2px dashed #999; border-radius: 12px; padding: 28px;
-          text-align: center; cursor: pointer; margin-bottom: 16px; }
-  #drop.over { border-color: #0b6efd; background: #f0f6ff; }
-  .row { display: flex; gap: 24px; flex-wrap: wrap; }
-  .panel { flex: 1 1 300px; }
-  label.slider { display: block; margin: 12px 0; font-size: .9rem; }
-  label.slider output { font-weight: bold; }
-  .select-group { margin: 12px 0; font-size: .9rem; }
-  .select-group label { display: block; margin-bottom: 4px; font-weight: 600; color: #444; }
-  .select-group select {
-    width: 100%; padding: 8px 10px; border: 1px solid #ccc;
-    border-radius: 8px; font-size: .9rem; background: #fff;
-    cursor: pointer; appearance: auto;
+  :root {
+    --primary: #1e40af;
+    --primary-hover: #1d4ed8;
+    --success: #15803d;
+    --success-bg: #f0fdf4;
+    --danger: #b91c1c;
+    --danger-bg: #fef2f2;
+    --border: #e2e8f0;
+    --bg-page: #f8fafc;
+    --bg-card: #ffffff;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --radius: 6px;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
   }
-  .select-group select:focus { outline: 2px solid #0b6efd; border-color: #0b6efd; }
-  .model-badge {
-    display: inline-block; margin-top: 4px; padding: 2px 8px;
-    background: #e8f0fe; color: #1a56db; border-radius: 6px; font-size: .8rem;
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg-page);
+    color: var(--text-main);
+    line-height: 1.5;
+    font-size: 14px;
   }
-  .model-badge.loaded { background: #dff0d8; color: #2e6b2e; }
-  button { background: #0b6efd; color: #fff; border: 0; border-radius: 8px;
-           padding: 10px 20px; font-size: 1rem; cursor: pointer; margin-top: 8px; }
-  button:disabled { background: #999; cursor: wait; }
-  #result img { max-width: 100%; border-radius: 8px; border: 1px solid #ddd; }
-  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: .9rem; }
-  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-  th { background: #f5f5f5; }
-  .fertile   { color: #1a7a1a; font-weight: bold; }
-  .infertile { color: #b3261e; font-weight: bold; }
-  #error { color: #b3261e; margin-top: 12px; white-space: pre-wrap; }
-  .counts { margin: 8px 0; font-size: .95rem; }
-  .info-used { margin: 4px 0; font-size: .82rem; color: #666; }
-  a.dl { display: inline-block; margin-top: 8px; font-size: .9rem; }
+
+  /* Header */
+  header {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .brand-title { font-size: 16px; font-weight: 700; color: #0f172a; }
+  .brand-subtitle { font-size: 12px; color: var(--text-muted); }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 500;
+    background: #f1f5f9;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .status-badge.ok { background: var(--success-bg); color: var(--success); border-color: #bbf7d0; }
+  .status-badge.err { background: var(--danger-bg); color: var(--danger); border-color: #fecaca; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* Layout */
+  .container {
+    max-width: 1280px;
+    margin: 20px auto;
+    padding: 0 16px;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 860px) {
+    .container { grid-template-columns: 1fr; }
+  }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .sidebar-heading {
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+  }
+  .form-label span.value { color: var(--primary); font-family: monospace; }
+  .form-desc { font-size: 11px; color: var(--text-muted); }
+
+  select.form-control {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-main);
+    font-size: 13px;
+    outline: none;
+  }
+  select.form-control:focus { border-color: var(--primary); }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--primary);
+    cursor: pointer;
+    height: 4px;
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn-secondary { background: #f8fafc; color: #334155; border-color: var(--border); }
+  .btn-secondary:hover { background: #f1f5f9; }
+  .btn-danger { background: #fff; color: var(--danger); border-color: #fecaca; }
+  .btn-danger:hover { background: var(--danger-bg); }
+
+  /* Main Content */
+  .main-content { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Dropzone */
+  .dropzone {
+    background: var(--bg-card);
+    border: 1px dashed #cbd5e1;
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .dropzone:hover, .dropzone.active {
+    border-color: var(--primary);
+    background: #f0f7ff;
+  }
+  .dropzone-title { font-size: 14px; font-weight: 600; color: #1e293b; }
+  .dropzone-subtitle { font-size: 12px; color: var(--text-muted); }
+
+  /* KPI Summary */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    box-shadow: var(--shadow);
+  }
+  .kpi-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; }
+  .kpi-value { font-size: 20px; font-weight: 700; color: #0f172a; line-height: 1.1; }
+  .kpi-value.fertile { color: var(--success); }
+  .kpi-value.infertile { color: var(--danger); }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Gallery Item Cards */
+  .item-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: var(--shadow);
+  }
+  .item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .item-name { font-size: 13px; font-weight: 600; color: #1e293b; }
+  .tag-group { display: flex; gap: 6px; align-items: center; }
+  .tag {
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tag-fertile { background: var(--success-bg); color: var(--success); }
+  .tag-infertile { background: var(--danger-bg); color: var(--danger); }
+  .tag-timing { background: #f1f5f9; color: var(--text-muted); font-family: monospace; }
+
+  /* Side-by-side Images */
+  .comparison-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  @media (max-width: 640px) {
+    .comparison-view { grid-template-columns: 1fr; }
+  }
+  .img-col { display: flex; flex-direction: column; gap: 4px; }
+  .img-meta {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+  }
+  .img-frame {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #090d16;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    aspect-ratio: 4 / 3;
+    position: relative;
+  }
+  .img-frame img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  /* Table */
+  details.details-box {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 6px 10px;
+  }
+  details.details-box summary {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    cursor: pointer;
+  }
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 6px;
+  }
+  table.data-table th, table.data-table td {
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  table.data-table th { background: #edf2f7; font-weight: 600; color: #475569; }
+
+  /* Spinner */
+  .spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #e2e8f0;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-box {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 13px;
+  }
+  .alert-box {
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid #fecaca;
+  }
 </style>
 </head>
 <body>
-<h1>Deteksi Fertilitas Telur</h1>
-<div class="sub">Gambar &rarr; <b>YOLO11n</b> (deteksi telur) &rarr; <b>Classifier pilihan</b> (fertile / infertile)</div>
-<div id="status">mengecek model…</div>
 
-<div id="drop">Seret gambar ke sini atau <b>klik untuk memilih</b> (JPG/PNG, maks 10MB)
-  <input type="file" id="file" accept="image/*" hidden>
-</div>
+<header>
+  <div>
+    <div class="brand-title">Sistem Deteksi Fertilitas Telur</div>
+    <div class="brand-subtitle">YOLO11n Detector + MobileNetV2 Classifier</div>
+  </div>
+  <div id="statusBadge" class="status-badge">
+    <span class="status-dot"></span>
+    <span id="statusLabel">Memeriksa status server...</span>
+  </div>
+</header>
 
-<div class="row">
-  <div class="panel">
+<div class="container">
 
-    <!-- Pilihan model classifier -->
-    <div class="select-group">
-      <label for="classifier_file">🧠 Model Classifier</label>
-      <select id="classifier_file">
+  <!-- Sidebar Konfigurasi -->
+  <aside class="sidebar">
+    <div class="sidebar-heading">Konfigurasi Model</div>
+
+    <div class="form-group">
+      <div class="form-label">
+        <label for="classifierSelect">Model Klasifikasi</label>
+      </div>
+      <select id="classifierSelect" class="form-control">
         {% if classifier_files %}
           {% for f in classifier_files %}
           <option value="{{ f }}" {% if f == default_classifier %}selected{% endif %}>
-            {{ f }}{% if f == default_classifier %} (default){% endif %}
+            {{ f }}{% if f == default_classifier %} (Default){% endif %}
           </option>
           {% endfor %}
         {% else %}
           <option value="" disabled>Tidak ada file .pt di folder model/</option>
         {% endif %}
       </select>
-      <span class="model-badge" id="model-badge">belum dimuat</span>
+      <div class="form-desc">{{ classifier_files|length }} file terdeteksi.</div>
     </div>
 
-    <label class="slider">Confidence detector: <output id="oConf">{{ det_conf }}</output>
-      <input type="range" id="det_conf" min="0.05" max="0.9" step="0.05" value="{{ det_conf }}" style="width:100%">
-    </label>
-    <label class="slider">Threshold fertile: <output id="oThr">{{ thr_fertile }}</output>
-      <input type="range" id="thr_fertile" min="0.05" max="0.95" step="0.05" value="{{ thr_fertile }}" style="width:100%">
-    </label>
+    <div class="form-group">
+      <div class="form-label">
+        <label for="sliderConf">Confidence Detector</label>
+        <span class="value" id="valConf">{{ det_conf }}</span>
+      </div>
+      <input type="range" id="sliderConf" min="0.05" max="0.95" step="0.05" value="{{ det_conf }}">
+      <div class="form-desc">Ambang batas sensitivitas deteksi bounding box.</div>
+    </div>
 
-    <button id="go" disabled>Jalankan deteksi</button>
-    <div id="error"></div>
-  </div>
+    <div class="form-group">
+      <div class="form-label">
+        <label for="sliderThr">Threshold Fertile</label>
+        <span class="value" id="valThr">{{ thr_fertile }}</span>
+      </div>
+      <input type="range" id="sliderThr" min="0.05" max="0.95" step="0.05" value="{{ thr_fertile }}">
+      <div class="form-desc">Ambang batas probabilitas fertile.</div>
+    </div>
 
-  <div class="panel" id="result" hidden>
-    <div class="counts" id="counts"></div>
-    <div class="info-used" id="info-used"></div>
-    <img id="out" alt="hasil anotasi">
-    <div><a class="dl" id="dl" download="hasil_telur.jpg">Unduh gambar hasil</a></div>
-    <table>
-      <thead><tr><th>#</th><th>Kelas</th><th>Prob</th><th>Box [x0,y0,x1,y1]</th></tr></thead>
-      <tbody id="tbody"></tbody>
-    </table>
-  </div>
+    <div class="form-group">
+      <div class="form-label">
+        <label for="sliderMargin">Crop Margin</label>
+        <span class="value" id="valMargin">{{ crop_margin }}%</span>
+      </div>
+      <input type="range" id="sliderMargin" min="0" max="30" step="5" value="{{ crop_margin }}">
+      <div class="form-desc">Padding ekstra potongan box telur.</div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:6px; margin-top:4px;">
+      <button id="btnReRun" class="btn btn-primary" style="display:none;">
+        Terapkan Ulang Parameter
+      </button>
+      <button id="btnClearAll" class="btn btn-secondary" style="display:none;">
+        Hapus Semua Gambar
+      </button>
+    </div>
+
+    <div id="errorBanner" class="alert-box" style="display:none;"></div>
+  </aside>
+
+  <!-- Area Utama -->
+  <main class="main-content">
+
+    <!-- Area Unggah Dropzone -->
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" accept="image/*" multiple hidden>
+      <div class="dropzone-title">Klik atau seret file gambar ke sini</div>
+      <div class="dropzone-subtitle">Mendukung banyak file sekaligus (JPG, PNG, WEBP) atau Paste (Ctrl+V)</div>
+    </div>
+
+    <!-- KPI Ringkasan Metrik -->
+    <div id="kpiRow" class="kpi-grid" style="display:none;">
+      <div class="kpi-card">
+        <span class="kpi-label">Total Telur Terdeteksi</span>
+        <span class="kpi-value" id="kpiTotal">0</span>
+        <span class="kpi-sub" id="kpiImgCount">0 gambar</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Fertile</span>
+        <span class="kpi-value fertile" id="kpiFertile">0</span>
+        <span class="kpi-sub" id="kpiFertilePct">0%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Infertile</span>
+        <span class="kpi-value infertile" id="kpiInfertile">0</span>
+        <span class="kpi-sub" id="kpiInfertilePct">0%</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Fertility Rate</span>
+        <span class="kpi-value" id="kpiRate">0%</span>
+        <span class="kpi-sub">Rasio fertilitas</span>
+      </div>
+    </div>
+
+    <!-- Galeri Hasil Per Gambar -->
+    <div id="galleryContainer" style="display:flex; flex-direction:column; gap:12px;">
+      <div class="empty-box" id="emptyPlaceholder">
+        Pilih atau seret gambar candling telur untuk memulai analisis otomatis.
+      </div>
+    </div>
+
+  </main>
 </div>
 
 <script>
-const $ = id => document.getElementById(id);
-const drop = $('drop'), fileInput = $('file'), go = $('go');
-const badge = $('model-badge');
+  const $ = id => document.getElementById(id);
 
-// --- status model saat halaman dibuka ---
-fetch('/api/health').then(r => r.json()).then(h => {
-  const s = $('status');
-  if (h.ok) {
-    s.textContent = 'model siap (' + h.models.device + ')';
-    s.className = 'ok';
-    badge.textContent = 'siap dimuat';
-    badge.className = 'model-badge loaded';
-  } else {
-    s.textContent = 'model BELUM siap: ' + (h.models.error || '');
-    s.className = 'err';
-    badge.textContent = 'error';
+  let activeItems = [];
+
+  const dropzone = $('dropzone');
+  const fileInput = $('fileInput');
+  const btnReRun = $('btnReRun');
+  const btnClearAll = $('btnClearAll');
+  const errorBanner = $('errorBanner');
+  const gallery = $('galleryContainer');
+
+  // Status Server Check
+  fetch('/api/health')
+    .then(r => r.json())
+    .then(d => {
+      const badge = $('statusBadge');
+      const label = $('statusLabel');
+      if (d.ok) {
+        badge.className = 'status-badge ok';
+        label.textContent = 'Server Siap (' + d.models.device + ')';
+      } else {
+        badge.className = 'status-badge err';
+        label.textContent = 'Error: ' + (d.models.error || 'Periksa server');
+      }
+    })
+    .catch(() => {
+      $('statusBadge').className = 'status-badge err';
+      $('statusLabel').textContent = 'Server Offline';
+    });
+
+  // Slider Readout
+  $('sliderConf').addEventListener('input', e => $('valConf').textContent = e.target.value);
+  $('sliderThr').addEventListener('input', e => $('valThr').textContent = e.target.value);
+  $('sliderMargin').addEventListener('input', e => $('valMargin').textContent = e.target.value + '%');
+
+  // Dropzone Events
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => {
+    if (e.target.files && e.target.files.length > 0) {
+      processIncomingFiles(e.target.files);
+      fileInput.value = '';
+    }
+  });
+
+  ['dragover', 'dragenter'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropzone.classList.add('active');
+    });
+  });
+
+  ['dragleave', 'drop'].forEach(evt => {
+    dropzone.addEventListener(evt, e => {
+      e.preventDefault();
+      dropzone.classList.remove('active');
+    });
+  });
+
+  dropzone.addEventListener('drop', e => {
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processIncomingFiles(e.dataTransfer.files);
+    }
+  });
+
+  window.addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const pasted = [];
+    for (let item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) pasted.push(file);
+      }
+    }
+    if (pasted.length > 0) processIncomingFiles(pasted);
+  });
+
+  // Pemrosesan Berkas & Zero-Latency Local Preview
+  async function processIncomingFiles(files) {
+    const valid = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (valid.length === 0) return;
+
+    errorBanner.style.display = 'none';
+
+    // 1. Render preview lokal seketika (0ms delay)
+    const newItems = valid.map(file => {
+      const id = 'item_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      const previewUrl = URL.createObjectURL(file);
+      return { id, file, previewUrl, resultData: null, loading: true };
+    });
+
+    activeItems = [...newItems, ...activeItems];
+    renderAllCards();
+
+    // 2. Kirim ke backend
+    const fd = new FormData();
+    for (let f of valid) {
+      fd.append('images', f);
+    }
+    fd.append('det_conf', $('sliderConf').value);
+    fd.append('thr_fertile', $('sliderThr').value);
+    fd.append('crop_margin', $('sliderMargin').value);
+    fd.append('classifier_file', $('classifierSelect').value);
+
+    try {
+      const res = await fetch('/api/predict', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!data.ok) {
+        throw new Error(data.error || 'Terjadi kesalahan pada server');
+      }
+
+      const results = data.results || [data];
+      newItems.forEach((it, idx) => {
+        it.resultData = results[idx] || null;
+        it.loading = false;
+      });
+
+      renderAllCards();
+    } catch (err) {
+      errorBanner.textContent = 'Gagal memproses gambar: ' + err.message;
+      errorBanner.style.display = 'block';
+      newItems.forEach(it => it.loading = false);
+      renderAllCards();
+    }
   }
-}).catch(() => {
-  $('status').textContent = 'gagal menghubungi server';
-  $('status').className = 'err';
-});
 
-// --- update badge saat ganti classifier ---
-$('classifier_file').addEventListener('change', () => {
-  badge.textContent = 'akan dimuat saat dijalankan';
-  badge.className = 'model-badge';
-});
+  // Hapus Item Satu per Satu
+  window.deleteItem = function(id) {
+    const it = activeItems.find(x => x.id === id);
+    if (it && it.previewUrl) {
+      URL.revokeObjectURL(it.previewUrl);
+    }
+    activeItems = activeItems.filter(x => x.id !== id);
+    renderAllCards();
+  };
 
-// --- slider label ---
-for (const [slider, out] of [['det_conf','oConf'], ['thr_fertile','oThr']]) {
-  $(slider).addEventListener('input', e => { $(out).textContent = e.target.value; });
-}
+  // Hapus Semua
+  btnClearAll.addEventListener('click', () => {
+    activeItems.forEach(it => {
+      if (it.previewUrl) URL.revokeObjectURL(it.previewUrl);
+    });
+    activeItems = [];
+    renderAllCards();
+  });
 
-// --- file drop / pick ---
-let currentFile = null;
-function setFile(f) {
-  if (!f || !f.type.startsWith('image/')) return;
-  currentFile = f; go.disabled = false;
-  drop.firstChild.textContent = 'Dipilih: ' + f.name + ' — klik untuk ganti / seret file lain. ';
-}
-drop.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', e => setFile(e.target.files[0]));
-['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
-['dragleave','drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
-drop.addEventListener('drop', e => setFile(e.dataTransfer.files[0]));
+  // Terapkan Ulang Parameter
+  btnReRun.addEventListener('click', () => {
+    const existingFiles = activeItems.map(it => it.file).filter(Boolean);
+    if (existingFiles.length === 0) return;
 
-// --- prediksi ---
-go.addEventListener('click', async () => {
-  if (!currentFile) return;
-  go.disabled = true;
-  $('error').textContent = '';
+    activeItems.forEach(it => {
+      if (it.previewUrl) URL.revokeObjectURL(it.previewUrl);
+    });
+    activeItems = [];
+    processIncomingFiles(existingFiles);
+  });
 
-  const fd = new FormData();
-  fd.append('image', currentFile);
-  fd.append('det_conf', $('det_conf').value);
-  fd.append('thr_fertile', $('thr_fertile').value);
-  fd.append('classifier_file', $('classifier_file').value);
+  // Render Kartu & Metrik
+  function renderAllCards() {
+    const kpiRow = $('kpiRow');
 
-  try {
-    const r = await fetch('/api/predict', { method: 'POST', body: fd });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (activeItems.length === 0) {
+      kpiRow.style.display = 'none';
+      btnReRun.style.display = 'none';
+      btnClearAll.style.display = 'none';
+      gallery.innerHTML = `
+        <div class="empty-box" id="emptyPlaceholder">
+          Pilih atau seret gambar candling telur untuk memulai analisis otomatis.
+        </div>
+      `;
+      return;
+    }
 
-    // update badge: model sudah berhasil digunakan
-    badge.textContent = '✓ digunakan';
-    badge.className = 'model-badge loaded';
+    let totalDetected = 0;
+    let totalFertile = 0;
+    let totalInfertile = 0;
 
-    $('out').src = j.annotated;
-    $('dl').href = j.annotated;
-    $('counts').innerHTML =
-      'Ditemukan <b>' + j.detections.length + '</b> telur — ' +
-      '<span class="fertile">fertile: ' + j.counts.fertile + '</span> · ' +
-      '<span class="infertile">infertile: ' + j.counts.infertile + '</span>';
-    $('info-used').textContent = 'Classifier: ' + (j.classifier_used || '-');
-    $('tbody').innerHTML = j.detections.map((d, i) =>
-      '<tr><td>' + (i+1) + '</td><td class="' + d.cls + '">' + d.cls + '</td><td>' +
-      d.prob.toFixed(3) + '</td><td>' + d.box.map(v => Math.round(v)).join(', ') + '</td></tr>'
-    ).join('') || '<tr><td colspan="4">Tidak ada telur terdeteksi. Coba turunkan confidence.</td></tr>';
-    $('result').hidden = false;
-  } catch (err) {
-    $('error').textContent = 'Gagal: ' + err.message;
-  } finally {
-    go.disabled = false;
+    activeItems.forEach(it => {
+      if (it.resultData) {
+        const counts = it.resultData.counts || { fertile: 0, infertile: 0 };
+        totalFertile += counts.fertile || 0;
+        totalInfertile += counts.infertile || 0;
+        totalDetected += (it.resultData.detections || []).length;
+      }
+    });
+
+    const rate = totalDetected > 0 ? ((totalFertile / totalDetected) * 100).toFixed(1) : 0;
+    const fPct = totalDetected > 0 ? ((totalFertile / totalDetected) * 100).toFixed(1) : 0;
+    const iPct = totalDetected > 0 ? ((totalInfertile / totalDetected) * 100).toFixed(1) : 0;
+
+    kpiRow.style.display = 'grid';
+    $('kpiTotal').textContent = totalDetected;
+    $('kpiImgCount').textContent = activeItems.length + ' gambar aktif';
+    $('kpiFertile').textContent = totalFertile;
+    $('kpiFertilePct').textContent = fPct + '%';
+    $('kpiInfertile').textContent = totalInfertile;
+    $('kpiInfertilePct').textContent = iPct + '%';
+    $('kpiRate').textContent = rate + '%';
+
+    btnReRun.style.display = 'inline-flex';
+    btnClearAll.style.display = 'inline-flex';
+
+    gallery.innerHTML = activeItems.map(item => {
+      const res = item.resultData;
+      const fCount = res?.counts?.fertile || 0;
+      const iCount = res?.counts?.infertile || 0;
+      const totalEggs = (res?.detections || []).length;
+      const timingText = res?.timing ? res.timing.total_ms + ' ms' : '';
+
+      const tableRows = (res?.detections || []).map((d, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><b style="color:${d.cls === 'fertile' ? 'var(--success)' : 'var(--danger)'}">${d.cls.toUpperCase()}</b></td>
+          <td>${(d.prob * 100).toFixed(1)}%</td>
+          <td><code>[${d.box.map(Math.round).join(', ')}]</code></td>
+        </tr>
+      `).join('');
+
+      return `
+        <div class="item-card" id="${item.id}">
+          <div class="item-header">
+            <div class="item-name">${item.file?.name || 'Citra Candling'}</div>
+            <div class="tag-group">
+              ${res ? `
+                <span class="tag tag-fertile">Fertil: ${fCount}</span>
+                <span class="tag tag-infertile">Infertil: ${iCount}</span>
+                ${timingText ? `<span class="tag tag-timing">${timingText}</span>` : ''}
+                <a href="${res.annotated}" download="hasil_${item.file?.name || 'deteksi.jpg'}" class="btn btn-secondary" style="padding:3px 8px; font-size:11px;">
+                  Unduh
+                </a>
+              ` : ''}
+              <button onclick="deleteItem('${item.id}')" class="btn btn-danger" style="padding:3px 8px; font-size:11px;" title="Hapus gambar ini">
+                Hapus
+              </button>
+            </div>
+          </div>
+
+          <div class="comparison-view">
+            <div class="img-col">
+              <div class="img-meta">
+                <span>Citra Asli</span>
+                <small>${res ? res.width + 'x' + res.height : ''}</small>
+              </div>
+              <div class="img-frame">
+                <img src="${item.previewUrl}" alt="Original">
+              </div>
+            </div>
+
+            <div class="img-col">
+              <div class="img-meta">
+                <span>Hasil Deteksi</span>
+                <small>${res ? totalEggs + ' telur terdeteksi' : ''}</small>
+              </div>
+              <div class="img-frame">
+                ${item.loading ? `
+                  <div class="skeleton-loader" style="display:flex; align-items:center; gap:8px; color:#94a3b8; font-size:12px;">
+                    <div class="spinner"></div>
+                    <span>Menganalisis...</span>
+                  </div>
+                ` : res ? `
+                  <img src="${res.annotated}" alt="Hasil Deteksi">
+                ` : `
+                  <div style="color:var(--danger); font-size:12px;">Gagal menganalisis gambar ini.</div>
+                `}
+              </div>
+            </div>
+          </div>
+
+          ${res && res.detections && res.detections.length > 0 ? `
+            <details class="details-box">
+              <summary>Detail Bounding Box (${res.detections.length} telur)</summary>
+              <table class="data-table">
+                <thead>
+                  <tr><th>#</th><th>Klasifikasi</th><th>Confidence</th><th>Koordinat Box</th></tr>
+                </thead>
+                <tbody>${tableRows}</tbody>
+              </table>
+            </details>
+          ` : res ? `
+            <div class="form-desc" style="color:#d97706;">Tidak ada telur terdeteksi dengan parameter saat ini. Sesuaikan slider Confidence pada panel kiri.</div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
   }
-});
 </script>
+
 </body>
 </html>
